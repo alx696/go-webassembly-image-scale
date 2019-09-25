@@ -1,8 +1,10 @@
 # Go WebAssembly 图片缩放
 
+访问 https://alx696.github.io/go-webassembly-image-scale/web/ 在线查看
+
 ## 开发
 
-设置IDEA开发和编译环境, 参考 https://github.com/golang/go/wiki/Configuring-GoLand-for-WebAssembly .
+IDEA开发和编译环境设置, 参考 https://github.com/golang/go/wiki/Configuring-GoLand-for-WebAssembly .
 
 ## 测试
 
