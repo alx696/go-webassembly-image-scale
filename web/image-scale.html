@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="cn">
+<head>
+  <meta charset="UTF-8">
+  <title>Go WebAssembly 图片缩放</title>
+  <script src="wasm_exec.js"></script>
+  <script>
+    'use strict';
+
+    const fetchCache = (name, url) => {
+      return new Promise((resolve, reject) => {
+
+        caches.open(name)
+            .then(cache => {
+              cache.match(url)
+                  .then(cacheResponse => {
+                    if (!cacheResponse) {
+                      fetch(url)
+                          .then(fetchResponse => {
+                            if (!fetchResponse.ok) {
+                              reject(fetchResponse.status);
+                              return;
+                            }
+
+                            cache.put(url, fetchResponse)
+                                .then(() => {
+                                  cache.match(url)
+                                      .then(fetchCacheResponse => {
+                                        resolve(fetchCacheResponse.clone());
+                                      });
+                                });
+                          });
+                    } else {
+                      resolve(cacheResponse.clone());
+                    }
+                  });
+            });
+
+      });
+    };
+
+    const wasm = () => {
+      return new Promise((resolve, reject) => {
+        const go = new Go();
+
+        WebAssembly.instantiateStreaming(
+            fetchCache('wasm1', './image-scale.wasm'),
+            go.importObject
+        )
+            .then((result) => {
+              go.run(result.instance);
+
+              resolve(
+                  (file, width, height) => {
+                    return new Promise((resolve, reject) => {
+                      let fileReader = new FileReader();
+                      fileReader.onload = (evt) => {
+                        let uint8Array = new Uint8Array(evt.target.result);
+
+                        //缩放图片
+                        const scaleImageUint8Array = go_scaleImage(uint8Array, parseInt(width), parseInt(height));
+                        if (!scaleImageUint8Array) {
+                          reject();
+                          return;
+                        }
+
+                        //创建Blob
+                        let blob = new Blob([scaleImageUint8Array], {'type': file.type});
+                        let objectURL = URL.createObjectURL(blob);
+
+                        resolve(objectURL);
+                      };
+                      fileReader.readAsArrayBuffer(file);
+                    });
+                  }
+              );
+            })
+            .catch(reject);
+      });
+    };
+
+    const init = (wasmScaleImage) => {
+      const submit = document.querySelector('#submit');
+      submit.removeAttribute('disabled');
+
+      document.querySelector('#form')
+          .addEventListener('submit', evt => {
+            evt.preventDefault();
+
+            let formData = new FormData(evt.target);
+            const data = {};
+            for (const key of formData.keys()) {
+              data[key] = formData.get(key);
+            }
+            console.debug('表单数据:', data);
+
+            submit.textContent = '正在处理...';
+            submit.setAttribute('disabled', 'disabled');
+            wasmScaleImage(data.file, data.width, data.height)
+                .then((objectURL) => {
+
+                  submit.textContent = '缩放';
+                  submit.removeAttribute('disabled');
+
+                  //自动下载
+                  let a = document.createElement('a');
+                  a.href = objectURL;
+                  a.download = data.file.name;
+                  a.click();
+                  URL.revokeObjectURL(objectURL);
+                });
+          });
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      wasm()
+          .then((wasmScaleImage) => {
+            init(wasmScaleImage);
+          })
+          .catch(error => {
+            console.warn(error);
+          });
+    });
+  </script>
+</head>
+<body>
+<form id="form">
+  <h1>缩放图片</h1>
+  <h3>只支持png或jpg格式图片！如需保持比例，宽度或高度只设置一个，另一个设为0。</h3>
+  <p>
+    <label>宽度: <input name="width" type="number" min="0" required value="240" placeholder="宽度" autofocus></label>
+  </p>
+  <p>
+    <label>高度: <input name="height" type="number" min="0" required value="0" placeholder="高度"></label>
+  </p>
+  <p>
+    <label>图片: <input name="file" type="file" accept=".png,.jpg,.jpeg" required></label>
+  </p>
+  <p>
+    <button id="submit" disabled>缩放</button>
+  </p>
+</form>
+</body>
+</html>
