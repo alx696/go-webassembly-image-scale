@@ -2,6 +2,8 @@
 
 访问 https://alx696.github.io/go-webassembly-image-scale/web/ 在线查看
 
+示例演示如何在JavaScript和Golang间传递文件(二进制数据).
+
 ## 开发
 
 IDEA开发和编译环境设置, 参考 https://github.com/golang/go/wiki/Configuring-GoLand-for-WebAssembly .
